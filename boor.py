@@ -3,7 +3,7 @@ import tkinter as Tk
 from tkinter import messagebox
 from PIL import ImageTk, Image
 
-global settlements, converter, data, forbid, current, canvas, settlements_data, labelText
+global settlements, converter, data, forbid, current, canvas, settlements_data, labelText, oval, root
 
 
 def read_settlements(filename = "settlements.csv"):
@@ -12,11 +12,12 @@ def read_settlements(filename = "settlements.csv"):
     captions = fid.readline()
     used_captions = {"name":0, "religion":8, "population":9, "establishment":13, "location":16}
     JEWISH = '1'
+    MEORAV = '4'
     data = {}
     for line in fid:
         splitted = line.split(",")
         name = splitted[used_captions["name"]]
-        if splitted[used_captions["religion"]] == JEWISH:
+        if splitted[used_captions["religion"]] in [JEWISH, MEORAV]:
             data[name] = {}
             for column in ["name", "population", "establishment", "location"]:
                 index = used_captions[column]
@@ -113,25 +114,38 @@ def choose_all(current, settlements, forbid = None):
         options+=choose_all(new_current, settlements, forbid)
     return options
 
-
-
 def draw_settlements(name):
     coordinates = converter(settlements_data[name]["itm"])
     coordinates = coordinates*zoom
     x,y = 10,10
     values = map(int, [coordinates[0]-x, coordinates[1]-y, coordinates[0]+x, coordinates[1]+y])
-    oval = canvas.create_oval(*values, outline='red',width=3,fill='')
-    return oval
+    canvas.coords(oval, *values)
 
 def kp(event):
     global settlements, converter, data, forbid, current
-    if event.char in "אבגדהוזחטיכלמנסעפצקרשת":
+    if event.keysym == "Escape":
+        root.destroy()
+    elif event.char == " ":
+        forbid=[]
+        current = ''
+        labelText.set("-")
+        canvas.coords(oval, -10,-10,-10,-10)
+
+    elif event.char in "אבגדהוזחטיכלמנסעפצקרשת":
         current = event.char + current
         options = choose_all(current,settlements)
         if not options:
             options = choose_all(current[1:],settlements)
-            all = ",".join([settlements_data[option[1]]["name"] for option in options])
-            messagebox.showerror(title="!אתה בור", message=all)
+            option = options[random.randint(0,len(options)-1)]
+            info = settlements_data[option[1]]
+            m1 = "שם הישוב:{}".format(info["name"])
+            m2 = "{}:הוקם בשנת".format(info["establishment"])
+            m3 = "{}:תושבים".format(info["population"])
+            message="\n".join([m1,m2,m3])
+            messagebox.showerror(title="!אתה בור", message=message)
+            # restart !
+            current = ''
+            options = choose_all(current,settlements)
         letter, chosen_settlement = options[random.randint(0,len(options)-1)]
 
         current = letter + current
@@ -146,17 +160,17 @@ pixels_x, pixels_y = tuple([int(zoom * x)  for x in image.size])
 background_image = ImageTk.PhotoImage(image.resize((pixels_x, pixels_y)))
 canvas = Tk.Canvas(root)
 image = canvas.create_image(0, 0, anchor=Tk.NW, image=background_image)
-#canvas.grid(row=0)
 labelText = Tk.StringVar()
 labelText.set("-")
 label = Tk.Label(root, textvariable=labelText)
-#label.grid(row=1)
+oval = canvas.create_oval(-10,-10,-10,10, outline='red',width=3,fill='')
 
 
 canvas.pack(side="top", fill="both", expand=True)
 label.pack(side="bottom")
-
-root.wm_geometry("794x370")
+root.minsize(width=pixels_x, height=pixels_y+15)
+root.resizable(0, 0) #Don't allow resizing in the x or y direction
+#root.wm_geometry("794x370")
 root.title('Map')
 root.bind_all('<KeyPress>', kp)
 root.mainloop()
