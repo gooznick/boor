@@ -2,6 +2,7 @@ import random
 import tkinter as Tk
 from tkinter import messagebox
 from PIL import ImageTk, Image
+import os
 
 global gui_globals, game_globals
 
@@ -227,9 +228,13 @@ def kp(event):
 
 
 # Read data
-main_file = "settlements.csv"
-exceptions_file  = "exceptions.csv"
-mapping_file  = "israel.csv"
+here_dir = os.path.dirname(__file__)
+
+main_file = os.path.join(here_dir,"settlements.csv")
+exceptions_file  = os.path.join(here_dir,"exceptions.csv")
+mapping_file  = os.path.join(here_dir,"israel.csv")
+image_file = os.path.join(here_dir,"israel.jpg")
+
 settlements_data = create_settlements_data(main_file, exceptions_file)
 settlements = list(settlements_data.keys())
 converter = create_coordinates_converter(settlements_data, mapping_file)
@@ -245,7 +250,7 @@ game_globals["settlements_data"] = settlements_data
 gui_globals["converter"] = converter
 gui_globals["root"] = Tk.Tk()
 root = gui_globals["root"]
-image = Image.open("israel.jpg")
+image = Image.open(image_file)
 gui_globals["zoom"] = .15
 pixels_x, pixels_y = tuple([int(gui_globals["zoom"] * x)  for x in image.size])
 background_image = ImageTk.PhotoImage(image.resize((pixels_x, pixels_y)))
