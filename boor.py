@@ -7,6 +7,19 @@ global settlements, converter, data, forbid, current, canvas, settlements_data, 
 
 
 def read_settlements(filename):
+    """
+    This method reads the settlements file.
+    It's an csv file, exported by excel, imported from https://data.gov.il/dataset/settlement-file :
+    https://www.cbs.gov.il/he/publications/doclib/2019/ishuvim/bycode2018.xlsx
+
+    The file begins with a BOM of utf8.
+
+    The method return an dictionary, the key is the name of the settlement, and the values are the parsed columns :
+        population
+        establishment (year)
+        location (touple, itm)
+    """
+
     fid = open(filename,"r",encoding="utf8")
     fid.read(1)  # ignore BOM
     captions = fid.readline()
@@ -28,7 +41,15 @@ def read_settlements(filename):
     return data
 
 def split_exceptions(data, filename):
-    fid = open("exceptions.csv","r",encoding="utf8")
+    """
+    This method uses an exceptions file to split some settlement to more than one :
+     ("תל אביב-יפו") will become both "תל אביב" and "יפו"
+    The manually made file is an csv, with the format :
+        name(as in the main file), name-option1, name-option2, ...
+    The original name will be deleted.
+    """
+
+    fid = open(filename,"r",encoding="utf8")
     fid.read(1)  # ignore BOM
     for line in fid:
         splitted = line.split(",")
@@ -41,7 +62,12 @@ def split_exceptions(data, filename):
     fid.close()
 
 def name_to_key(name):
+    """
+    Convert name of a settlement to a key of the dictionary.
+    The key will be the final name in the game
+    """
     # remove what in ()
+    name = name.strip()
     if "(" in name and ")" in name:
         name = name[:name.find("(")]+name[name.find(")")+1:]
     # end letters
@@ -51,12 +77,18 @@ def name_to_key(name):
     name = ''.join(ch for ch in name if ch.isalnum())
     return name[::-1]
 
-def create_coordinates_converter(data):
-    avnei = name_to_key("אבני איתן")
-    ramon = name_to_key("מצפה רמון")
-    oren = name_to_key("בית אורן")
-    gamliel = name_to_key("בית גמליאל")
-    map_locations = {avnei:(1852,1088), ramon:(739,3999), oren:(997,1216), gamliel:(713,2371)}
+def create_coordinates_converter(settlements_data, map_file):
+    """
+    Create coordinate converted from itm to the image coordinates, using 3 pre-found settlements.
+    """
+
+    fid = open(map_file,"r",encoding="utf8")
+    fid.read(1)  # ignore BOM
+    mappings = {}
+    for line in fid:
+        splitted = line.split(",")
+        mappings[name_to_key(splitted[0])] = (int(splitted[1]),int(splitted[2]))
+
     import numpy as np
     def solve_affine( p1, p2, p3, s1, s2, s3 ):
         x = np.transpose(np.matrix([p1,p2,p3]))
@@ -69,14 +101,19 @@ def create_coordinates_converter(data):
         # return function that takes input x and transforms it
         # don't need to return the 4th row as it is
         return lambda x: (A2*np.vstack((np.matrix(x).reshape(2,1),1)))[0:2,:]
-
-    transformFn = solve_affine( data[avnei]["itm"], data[ramon]["itm"], data[oren]["itm"],
-                                map_locations[avnei], map_locations[ramon], map_locations[oren])
-    gmliel_transformed = transformFn(data[gamliel]["itm"])  # test
+    map_settlemets = list(mappings.keys())
+    transformFn = solve_affine( settlements_data[map_settlemets[0]]["itm"], settlements_data[map_settlemets[1]]["itm"], settlements_data[map_settlemets[2]]["itm"],
+                                mappings[map_settlemets[0]], mappings[map_settlemets[1]], mappings[map_settlemets[2]])
 
     return transformFn
 
 def create_settlements_data(main_file, exceptions_file):
+    """
+    Create settlement data from settlements and exceptions csv files
+
+    Output :
+    a dictionary - keys are the final names of the game, value is a dictionary with the data about each settlement
+    """
     data = read_settlements(main_file)
     split_exceptions(data,exceptions_file)
 
@@ -88,15 +125,15 @@ def create_settlements_data(main_file, exceptions_file):
     return settlements_data
 
 
-
+# Read data
 main_file = "settlements.csv"
 exceptions_file  = "exceptions.csv"
+mapping_file  = "israel.csv"
 settlements_data = create_settlements_data(main_file, exceptions_file)
-
-
-
 settlements = list(settlements_data.keys())
-converter = create_coordinates_converter(settlements_data)
+
+
+converter = create_coordinates_converter(settlements_data, mapping_file)
 
 forbid=[]
 current = ''
@@ -163,7 +200,7 @@ def kp(event):
 
 
 root = Tk.Tk()
-image = Image.open("Clipboard01.jpg")
+image = Image.open("israel.jpg")
 zoom = .1
 pixels_x, pixels_y = tuple([int(zoom * x)  for x in image.size])
 background_image = ImageTk.PhotoImage(image.resize((pixels_x, pixels_y)))
