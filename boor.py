@@ -1,14 +1,59 @@
 import random
-fid=open("settlements.txt","r",encoding="utf8")
-lines=fid.readlines()
-fid.close()
-settlements = list(map(lambda x: x.strip()[::-1], lines))
-for r in '"':
-    settlements = [s for s in settlements if r not in s]
-for r in '()" -'+"'":
-    settlements = list(map(lambda x: x.replace(r,''), settlements))
-for f,t in zip("מנצפכ", "םןץףך"):
-    settlements = list(map(lambda x: x.replace(t,f), settlements))
+
+
+def read_settlements(filename = "settlements.csv"):
+    fid = open(filename,"r",encoding="utf8")
+    fid.read(1)  # ignore BOM
+    captions = fid.readline()
+    used_captions = {"name":0, "religion":8, "population":9, "establishment":13, "location":16}
+    JEWISH = '1'
+    data = {}
+    for line in fid:
+        splitted = line.split(",")
+        name = splitted[used_captions["name"]]
+        if splitted[used_captions["religion"]] == JEWISH:
+            data[name] = {}
+            for column in ["name", "population", "establishment", "location"]:
+                index = used_captions[column]
+                data[name][column] = splitted[index]
+    fid.close()
+    return data
+
+def split_exceptions(data, filename = "exceptions.csv"):
+    fid = open("exceptions.csv","r",encoding="utf8")
+    fid.read(1)  # ignore BOM
+    for line in fid:
+        splitted = line.split(",")
+        name = splitted[0]
+        for alternative in splitted[1:]:
+            alternative=alternative.strip()
+            if alternative:
+                print(alternative)
+                data[alternative] = data[name]
+        del data[name]
+    fid.close()
+
+def my_strip(name):
+    # remove what in ()
+    if "(" in name and ")" in name:
+        name = name[:name.find("(")]+name[name.find(")")+1:]
+    # end letters
+    for f,t in zip("מנצפכ", "םןץףך"):
+        name = name.replace(t,f)
+    # special characters
+    name = ''.join(ch for ch in name if ch.isalnum())
+    return name
+
+data = read_settlements()
+split_exceptions(data)
+
+settlements_data={}
+for key, value in data.items():
+    if not key:
+        pass
+    settlements_data[my_strip(key)] = value
+
+settlements = list(settlements_data.keys())
 
 print(settlements[0:10])
 
