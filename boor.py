@@ -221,7 +221,7 @@ def kp(event):
         game_globals["current"] = letter + game_globals["current"]
         to_show = game_globals["current"][::-1]
         if len(to_show)>50:
-            to_show=to_show[:50]
+            to_show=to_show[50:]
         gui_globals["label"].set(to_show)
         draw_settlements(chosen_settlement)
         gui_globals["canvas"].itemconfig(gui_globals["points"], text=str(len(game_globals["current"])*5))
