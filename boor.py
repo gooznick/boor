@@ -3,7 +3,7 @@ import tkinter as Tk
 from tkinter import messagebox
 from PIL import ImageTk, Image
 
-global settlements, converter, forbid, current, canvas, settlements_data, labelText, oval, root
+global gui_globals, settlements, converter, forbid, current, canvas, settlements_data, root, points, zoom
 
 
 def read_settlements(filename):
@@ -132,20 +132,6 @@ def create_settlements_data(main_file, exceptions_file):
     return settlements_data
 
 
-# Read data
-main_file = "settlements.csv"
-exceptions_file  = "exceptions.csv"
-mapping_file  = "israel.csv"
-settlements_data = create_settlements_data(main_file, exceptions_file)
-settlements = list(settlements_data.keys())
-
-
-converter = create_coordinates_converter(settlements_data, mapping_file)
-
-forbid=[]
-current = ''
-
-
 def choose_all(current, settlements, former = None):
     """
     The main function.
@@ -188,10 +174,10 @@ def find_all_former(options):
 
 def draw_settlements(name):
     coordinates = converter(settlements_data[name]["itm"])
-    coordinates = coordinates*zoom
+    coordinates = coordinates*gui_globals["zoom"]
     x,y = 10,10
     values = map(int, [coordinates[0]-x, coordinates[1]-y, coordinates[0]+x, coordinates[1]+y])
-    canvas.coords(oval, *values)
+    canvas.coords(gui_globals["oval"], *values)
 
 def kp(event):
     global settlements, converter, forbid, current
@@ -201,8 +187,8 @@ def kp(event):
     elif char == " ":
         forbid=[]
         current = ''
-        labelText.set("-")
-        canvas.coords(oval, -10,-10,-10,-10)
+        gui_globals["label"].set("-")
+        canvas.coords(gui_globals["label"], -10,-10,-10,-10)
 
     elif char in "אבגדהוזחטיכלמנסעפצקרשת":
         current = char + current
@@ -233,23 +219,36 @@ def kp(event):
         letter, chosen_settlement, former = options[random.randint(0,len(options)-1)]
 
         current = letter + current
-        labelText.set(current[::-1])
+        gui_globals["label"].set(current[::-1])
         draw_settlements(chosen_settlement)
+        canvas.itemconfig(points, text=str(len(current)*5))
 
+
+# Read data
+main_file = "settlements.csv"
+exceptions_file  = "exceptions.csv"
+mapping_file  = "israel.csv"
+settlements_data = create_settlements_data(main_file, exceptions_file)
+settlements = list(settlements_data.keys())
+converter = create_coordinates_converter(settlements_data, mapping_file)
+
+# init globals
+forbid=[]
+current = ''
 
 root = Tk.Tk()
 image = Image.open("israel.jpg")
-zoom = .2
-pixels_x, pixels_y = tuple([int(zoom * x)  for x in image.size])
+gui_globals = {}
+gui_globals["zoom"] = .1
+pixels_x, pixels_y = tuple([int(gui_globals["zoom"] * x)  for x in image.size])
 background_image = ImageTk.PhotoImage(image.resize((pixels_x, pixels_y)))
 canvas = Tk.Canvas(root)
 image = canvas.create_image(0, 0, anchor=Tk.NW, image=background_image)
-labelText = Tk.StringVar()
-labelText.set("-")
-label = Tk.Label(root, textvariable=labelText)
-oval = canvas.create_oval(-10,-10,-10,10, outline='red',width=3,fill='')
-
-
+points = canvas.create_text(250*gui_globals["zoom"],150*gui_globals["zoom"],fill="orange",font="Times 20 italic bold", text="-")
+gui_globals["label"] = Tk.StringVar()
+gui_globals["label"].set("-")
+label = Tk.Label(root, textvariable=gui_globals["label"])
+gui_globals["oval"] = canvas.create_oval(-10,-10,-10,10, outline='red',width=3,fill='')
 canvas.pack(side="top", fill="both", expand=True)
 label.pack(side="bottom")
 root.minsize(width=pixels_x, height=pixels_y+15)
@@ -258,17 +257,20 @@ root.title('Map')
 root.bind_all('<KeyPress>', kp)
 root.mainloop()
 
-quit()
-for a in range(1000000):
-    options = choose_all(current,settlements)
-    if not options:
-        print("end")
-        quit()
-    letter, chosen_settlement, former = options[random.randint(0,len(options)-1)]
-    current = letter + current
-    print(current)
-    your = input("?")
-    current = your + current
-    print(current, chosen_settlement)
+
+
+# usused
+def no_gui():
+    for a in range(1000000):
+        options = choose_all(current,settlements)
+        if not options:
+            print("end")
+            quit()
+        letter, chosen_settlement, former = options[random.randint(0,len(options)-1)]
+        current = letter + current
+        print(current)
+        your = input("?")
+        current = your + current
+        print(current, chosen_settlement)
 
 
