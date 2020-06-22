@@ -6,7 +6,7 @@ from PIL import ImageTk, Image
 global settlements, converter, data, forbid, current, canvas, settlements_data, labelText, oval, root
 
 
-def read_settlements(filename = "settlements.csv"):
+def read_settlements(filename):
     fid = open(filename,"r",encoding="utf8")
     fid.read(1)  # ignore BOM
     captions = fid.readline()
@@ -27,7 +27,7 @@ def read_settlements(filename = "settlements.csv"):
     fid.close()
     return data
 
-def split_exceptions(data, filename = "exceptions.csv"):
+def split_exceptions(data, filename):
     fid = open("exceptions.csv","r",encoding="utf8")
     fid.read(1)  # ignore BOM
     for line in fid:
@@ -40,7 +40,7 @@ def split_exceptions(data, filename = "exceptions.csv"):
         del data[name]
     fid.close()
 
-def my_strip(name):
+def name_to_key(name):
     # remove what in ()
     if "(" in name and ")" in name:
         name = name[:name.find("(")]+name[name.find(")")+1:]
@@ -49,13 +49,13 @@ def my_strip(name):
         name = name.replace(t,f)
     # special characters
     name = ''.join(ch for ch in name if ch.isalnum())
-    return name
+    return name[::-1]
 
 def create_coordinates_converter(data):
-    avnei = "אבני איתן"
-    ramon = "מצפה רמון"
-    oren = "בית אורן"
-    gamliel = "בית גמליאל"
+    avnei = name_to_key("אבני איתן")
+    ramon = name_to_key("מצפה רמון")
+    oren = name_to_key("בית אורן")
+    gamliel = name_to_key("בית גמליאל")
     map_locations = {avnei:(1852,1088), ramon:(739,3999), oren:(997,1216), gamliel:(713,2371)}
     import numpy as np
     def solve_affine( p1, p2, p3, s1, s2, s3 ):
@@ -76,18 +76,27 @@ def create_coordinates_converter(data):
 
     return transformFn
 
+def create_settlements_data(main_file, exceptions_file):
+    data = read_settlements(main_file)
+    split_exceptions(data,exceptions_file)
 
-data = read_settlements()
-split_exceptions(data)
+    settlements_data={}
+    for key, value in data.items():
+        if not key:
+            pass
+        settlements_data[name_to_key(key)] = value
+    return settlements_data
 
-settlements_data={}
-for key, value in data.items():
-    if not key:
-        pass
-    settlements_data[my_strip(key)[::-1]] = value
+
+
+main_file = "settlements.csv"
+exceptions_file  = "exceptions.csv"
+settlements_data = create_settlements_data(main_file, exceptions_file)
+
+
 
 settlements = list(settlements_data.keys())
-converter = create_coordinates_converter(data)
+converter = create_coordinates_converter(settlements_data)
 
 forbid=[]
 current = ''
