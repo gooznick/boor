@@ -3,7 +3,7 @@ import tkinter as Tk
 from tkinter import messagebox
 from PIL import ImageTk, Image
 
-global gui_globals, settlements, converter, forbid, current, canvas, settlements_data, root, points, zoom
+global gui_globals, settlements, converter, forbid, current, settlements_data
 
 
 def read_settlements(filename):
@@ -177,18 +177,18 @@ def draw_settlements(name):
     coordinates = coordinates*gui_globals["zoom"]
     x,y = 10,10
     values = map(int, [coordinates[0]-x, coordinates[1]-y, coordinates[0]+x, coordinates[1]+y])
-    canvas.coords(gui_globals["oval"], *values)
+    gui_globals["canvas"].coords(gui_globals["oval"], *values)
 
 def kp(event):
     global settlements, converter, forbid, current
     char = remove_sofit(event.char)
     if event.keysym == "Escape":
-        root.destroy()
+        gui_globals["root"].destroy()
     elif char == " ":
         forbid=[]
         current = ''
         gui_globals["label"].set("-")
-        canvas.coords(gui_globals["label"], -10,-10,-10,-10)
+        gui_globals["canvas"].coords(gui_globals["label"], -10,-10,-10,-10)
 
     elif char in "אבגדהוזחטיכלמנסעפצקרשת":
         current = char + current
@@ -221,7 +221,7 @@ def kp(event):
         current = letter + current
         gui_globals["label"].set(current[::-1])
         draw_settlements(chosen_settlement)
-        canvas.itemconfig(points, text=str(len(current)*5))
+        gui_globals["canvas"].itemconfig(gui_globals["points"], text=str(len(current)*5))
 
 
 # Read data
@@ -235,16 +235,18 @@ converter = create_coordinates_converter(settlements_data, mapping_file)
 # init globals
 forbid=[]
 current = ''
-
-root = Tk.Tk()
-image = Image.open("israel.jpg")
 gui_globals = {}
+
+gui_globals["root"] = Tk.Tk()
+root = gui_globals["root"]
+image = Image.open("israel.jpg")
 gui_globals["zoom"] = .1
 pixels_x, pixels_y = tuple([int(gui_globals["zoom"] * x)  for x in image.size])
 background_image = ImageTk.PhotoImage(image.resize((pixels_x, pixels_y)))
-canvas = Tk.Canvas(root)
+canvas = Tk.Canvas(gui_globals["root"])
+gui_globals["canvas"] = canvas
 image = canvas.create_image(0, 0, anchor=Tk.NW, image=background_image)
-points = canvas.create_text(250*gui_globals["zoom"],150*gui_globals["zoom"],fill="orange",font="Times 20 italic bold", text="-")
+gui_globals["points"] = canvas.create_text(250*gui_globals["zoom"],150*gui_globals["zoom"],fill="orange",font="Times 20 italic bold", text="-")
 gui_globals["label"] = Tk.StringVar()
 gui_globals["label"].set("-")
 label = Tk.Label(root, textvariable=gui_globals["label"])
