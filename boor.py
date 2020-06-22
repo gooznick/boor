@@ -28,7 +28,6 @@ def split_exceptions(data, filename = "exceptions.csv"):
         for alternative in splitted[1:]:
             alternative=alternative.strip()
             if alternative:
-                print(alternative)
                 data[alternative] = data[name]
         del data[name]
     fid.close()
@@ -53,7 +52,7 @@ for key, value in data.items():
         pass
     settlements_data[my_strip(key)] = value
 
-settlements = list(settlements_data.keys())
+settlements = list(map(lambda x:x[::-1],settlements_data.keys()))
 
 print(settlements[0:10])
 
@@ -88,7 +87,7 @@ for a in range(1000000):
     letter, chosen_settlement = options[random.randint(0,len(options)-1)]
     current = letter + current
     print(current)
-    #your = input("?")
-    #current = your + current
-    #print(current, chosen_settlement)
+    your = input("?")
+    current = your + current
+    print(current, chosen_settlement)
 
