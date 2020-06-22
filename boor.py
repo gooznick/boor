@@ -1,4 +1,9 @@
 import random
+import tkinter as Tk
+from tkinter import messagebox
+from PIL import ImageTk, Image
+
+global settlements, converter, data, forbid, current, canvas, settlements_data, labelText
 
 
 def read_settlements(filename = "settlements.csv"):
@@ -16,6 +21,8 @@ def read_settlements(filename = "settlements.csv"):
             for column in ["name", "population", "establishment", "location"]:
                 index = used_captions[column]
                 data[name][column] = splitted[index]
+            itm = data[name]["location"]
+            data[name]["itm"] = (float(itm[:5]), float(itm[5:]))
     fid.close()
     return data
 
@@ -43,6 +50,32 @@ def my_strip(name):
     name = ''.join(ch for ch in name if ch.isalnum())
     return name
 
+def create_coordinates_converter(data):
+    avnei = "אבני איתן"
+    ramon = "מצפה רמון"
+    oren = "בית אורן"
+    gamliel = "בית גמליאל"
+    map_locations = {avnei:(1852,1088), ramon:(739,3999), oren:(997,1216), gamliel:(713,2371)}
+    import numpy as np
+    def solve_affine( p1, p2, p3, s1, s2, s3 ):
+        x = np.transpose(np.matrix([p1,p2,p3]))
+        y = np.transpose(np.matrix([s1,s2,s3]))
+        # add ones on the bottom of x and y
+        x = np.vstack((x,[1,1,1]))
+        y = np.vstack((y,[1,1,1]))
+        # solve for A2
+        A2 = y * x.I
+        # return function that takes input x and transforms it
+        # don't need to return the 4th row as it is
+        return lambda x: (A2*np.vstack((np.matrix(x).reshape(2,1),1)))[0:2,:]
+
+    transformFn = solve_affine( data[avnei]["itm"], data[ramon]["itm"], data[oren]["itm"],
+                                map_locations[avnei], map_locations[ramon], map_locations[oren])
+    gmliel_transformed = transformFn(data[gamliel]["itm"])  # test
+
+    return transformFn
+
+
 data = read_settlements()
 split_exceptions(data)
 
@@ -50,11 +83,14 @@ settlements_data={}
 for key, value in data.items():
     if not key:
         pass
-    settlements_data[my_strip(key)] = value
+    settlements_data[my_strip(key)[::-1]] = value
 
-settlements = list(map(lambda x:x[::-1],settlements_data.keys()))
+settlements = list(settlements_data.keys())
+converter = create_coordinates_converter(data)
 
-print(settlements[0:10])
+forbid=[]
+current = ''
+
 
 # will return list of tuples - the next letter and next settlement
 def choose_all(current, settlements, forbid = None):
@@ -78,7 +114,54 @@ def choose_all(current, settlements, forbid = None):
     return options
 
 
-current = ''
+
+def draw_settlements(name):
+    coordinates = converter(settlements_data[name]["itm"])
+    coordinates = coordinates*zoom
+    x,y = 10,10
+    values = map(int, [coordinates[0]-x, coordinates[1]-y, coordinates[0]+x, coordinates[1]+y])
+    oval = canvas.create_oval(*values, outline='red',width=3,fill='')
+    return oval
+
+def kp(event):
+    global settlements, converter, data, forbid, current
+    if event.char in "אבגדהוזחטיכלמנסעפצקרשת":
+        current = event.char + current
+        options = choose_all(current,settlements)
+        if not options:
+            options = choose_all(current[1:],settlements)
+            all = ",".join([settlements_data[option[1]]["name"] for option in options])
+            messagebox.showerror(title="!אתה בור", message=all)
+        letter, chosen_settlement = options[random.randint(0,len(options)-1)]
+
+        current = letter + current
+        labelText.set(current[::-1])
+        draw_settlements(chosen_settlement)
+
+
+root = Tk.Tk()
+image = Image.open("Clipboard01.jpg")
+zoom = .1
+pixels_x, pixels_y = tuple([int(zoom * x)  for x in image.size])
+background_image = ImageTk.PhotoImage(image.resize((pixels_x, pixels_y)))
+canvas = Tk.Canvas(root)
+image = canvas.create_image(0, 0, anchor=Tk.NW, image=background_image)
+#canvas.grid(row=0)
+labelText = Tk.StringVar()
+labelText.set("-")
+label = Tk.Label(root, textvariable=labelText)
+#label.grid(row=1)
+
+
+canvas.pack(side="top", fill="both", expand=True)
+label.pack(side="bottom")
+
+root.wm_geometry("794x370")
+root.title('Map')
+root.bind_all('<KeyPress>', kp)
+root.mainloop()
+
+quit()
 for a in range(1000000):
     options = choose_all(current,settlements)
     if not options:
@@ -90,4 +173,5 @@ for a in range(1000000):
     your = input("?")
     current = your + current
     print(current, chosen_settlement)
+
 
