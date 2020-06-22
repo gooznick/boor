@@ -3,7 +3,7 @@ import tkinter as Tk
 from tkinter import messagebox
 from PIL import ImageTk, Image
 
-global gui_globals, settlements, converter, forbid, current, settlements_data
+global gui_globals, game_globals
 
 
 def read_settlements(filename):
@@ -173,28 +173,28 @@ def find_all_former(options):
 
 
 def draw_settlements(name):
-    coordinates = converter(settlements_data[name]["itm"])
+    coordinates = gui_globals["converter"](settlements_data[name]["itm"])
     coordinates = coordinates*gui_globals["zoom"]
     x,y = 10,10
     values = map(int, [coordinates[0]-x, coordinates[1]-y, coordinates[0]+x, coordinates[1]+y])
     gui_globals["canvas"].coords(gui_globals["oval"], *values)
 
 def kp(event):
-    global settlements, converter, forbid, current
+    settlements_data, settlements = game_globals["settlements_data"], game_globals["settlements"]
     char = remove_sofit(event.char)
     if event.keysym == "Escape":
         gui_globals["root"].destroy()
     elif char == " ":
-        forbid=[]
-        current = ''
+        game_globals["forbid"]=[]
+        game_globals["current"] = ''
         gui_globals["label"].set("-")
         gui_globals["canvas"].coords(gui_globals["label"], -10,-10,-10,-10)
 
     elif char in "אבגדהוזחטיכלמנסעפצקרשת":
-        current = char + current
-        options = choose_all(current, settlements, forbid)
+        game_globals["current"] = char + game_globals["current"]
+        options = choose_all(game_globals["current"], settlements, game_globals["forbid"])
         if not options:
-            options = choose_all(current[1:],settlements, forbid)
+            options = choose_all(game_globals["current"][1:],settlements, game_globals["forbid"])
             option = options[random.randint(0,len(options)-1)]
             info = settlements_data[option[1]]
             draw_settlements(option[1])
@@ -210,18 +210,18 @@ def kp(event):
                 message += ":מחוץ למשחק"
                 message += "\n"
                 message += ",".join(names)
-                forbid = list(all_former)
+                game_globals["forbid"] = list(all_former)
 
             messagebox.showerror(title="!אתה בור", message=message)
             # restart !
-            current = ''
-            options = choose_all(current,settlements, forbid)
+            game_globals["current"] = ''
+            options = choose_all(game_globals["current"],settlements, game_globals["forbid"])
         letter, chosen_settlement, former = options[random.randint(0,len(options)-1)]
 
-        current = letter + current
-        gui_globals["label"].set(current[::-1])
+        game_globals["current"] = letter + game_globals["current"]
+        gui_globals["label"].set(game_globals["current"][::-1])
         draw_settlements(chosen_settlement)
-        gui_globals["canvas"].itemconfig(gui_globals["points"], text=str(len(current)*5))
+        gui_globals["canvas"].itemconfig(gui_globals["points"], text=str(len(game_globals["current"])*5))
 
 
 # Read data
@@ -233,10 +233,14 @@ settlements = list(settlements_data.keys())
 converter = create_coordinates_converter(settlements_data, mapping_file)
 
 # init globals
-forbid=[]
-current = ''
 gui_globals = {}
+game_globals = {}
+game_globals["settlements"] = settlements
+game_globals["current"] = ''
+game_globals["forbid"] = []
+game_globals["settlements_data"] = settlements_data
 
+gui_globals["converter"] = converter
 gui_globals["root"] = Tk.Tk()
 root = gui_globals["root"]
 image = Image.open("israel.jpg")
