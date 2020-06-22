@@ -5,7 +5,6 @@ from PIL import ImageTk, Image
 
 global gui_globals, game_globals
 
-
 def read_settlements(filename):
     """
     This method reads the settlements file.
@@ -219,7 +218,10 @@ def kp(event):
         letter, chosen_settlement, former = options[random.randint(0,len(options)-1)]
 
         game_globals["current"] = letter + game_globals["current"]
-        gui_globals["label"].set(game_globals["current"][::-1])
+        to_show = game_globals["current"][::-1]
+        if len(to_show)>50:
+            to_show=to_show[:50]
+        gui_globals["label"].set(to_show)
         draw_settlements(chosen_settlement)
         gui_globals["canvas"].itemconfig(gui_globals["points"], text=str(len(game_globals["current"])*5))
 
@@ -244,7 +246,7 @@ gui_globals["converter"] = converter
 gui_globals["root"] = Tk.Tk()
 root = gui_globals["root"]
 image = Image.open("israel.jpg")
-gui_globals["zoom"] = .1
+gui_globals["zoom"] = .15
 pixels_x, pixels_y = tuple([int(gui_globals["zoom"] * x)  for x in image.size])
 background_image = ImageTk.PhotoImage(image.resize((pixels_x, pixels_y)))
 canvas = Tk.Canvas(gui_globals["root"])
