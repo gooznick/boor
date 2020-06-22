@@ -3,7 +3,7 @@ import tkinter as Tk
 from tkinter import messagebox
 from PIL import ImageTk, Image
 
-global settlements, converter, data, forbid, current, canvas, settlements_data, labelText, oval, root
+global settlements, converter, forbid, current, canvas, settlements_data, labelText, oval, root
 
 
 def read_settlements(filename):
@@ -61,6 +61,15 @@ def split_exceptions(data, filename):
         del data[name]
     fid.close()
 
+def remove_sofit(name):
+    """
+    Change the final letters מנצפכ to regular
+    """
+    # end letters
+    for f,t in zip("מנצפכ", "םןץףך"):
+        name = name.replace(t,f)
+    return name
+
 def name_to_key(name):
     """
     Convert name of a settlement to a key of the dictionary.
@@ -70,9 +79,7 @@ def name_to_key(name):
     name = name.strip()
     if "(" in name and ")" in name:
         name = name[:name.find("(")]+name[name.find(")")+1:]
-    # end letters
-    for f,t in zip("מנצפכ", "םןץףך"):
-        name = name.replace(t,f)
+    name = remove_sofit(name)
     # special characters
     name = ''.join(ch for ch in name if ch.isalnum())
     return name[::-1]
@@ -139,26 +146,45 @@ forbid=[]
 current = ''
 
 
-# will return list of tuples - the next letter and next settlement
-def choose_all(current, settlements, forbid = None):
-    if not forbid:
-        forbid=[]
+def choose_all(current, settlements, former = None):
+    """
+    The main function.
+
+    Will return all possibilities, a list of tuples :
+        next letter, next settlement, former settlements
+    """
+    if not former:
+        former=[]
     # first time - all are ok
     if not current:
-        return [(s[-1], s) for s in settlements]
+        return [(s[-1], s, []) for s in settlements]
 
     # find starts with the letter
     settlements_options = list(filter(lambda x:x.endswith(current) and x!=current, settlements))
-    settlements_options = list(filter(lambda x:x not in forbid, settlements_options))
-    options = [(s[-1-len(current)], s) for s in settlements_options]
+    settlements_options = list(filter(lambda x:x not in former, settlements_options))
+    options = [(s[-1-len(current)], s, former) for s in settlements_options]
 
     # find if a full settlements can be removed
     full_settlement = list(filter(lambda x:current.endswith(x), settlements))
     for fs in full_settlement:
-        forbid += [fs]
+        former += [fs]
         new_current = current[:-len(fs)]
-        options+=choose_all(new_current, settlements, forbid)
+        options+=choose_all(new_current, settlements, former)
     return options
+
+def find_all_former(options):
+    """
+    Find all settlements that were already in the game, from the options.
+
+    (will find only settlements that are sure)
+    """
+    if not options :
+        return set()
+    former = set(options[0][2])  # begin with first
+    for option in options :
+        former = former.intersection(set(option[2]))  # all former
+    return former
+
 
 def draw_settlements(name):
     coordinates = converter(settlements_data[name]["itm"])
@@ -168,31 +194,43 @@ def draw_settlements(name):
     canvas.coords(oval, *values)
 
 def kp(event):
-    global settlements, converter, data, forbid, current
+    global settlements, converter, forbid, current
+    char = remove_sofit(event.char)
     if event.keysym == "Escape":
         root.destroy()
-    elif event.char == " ":
+    elif char == " ":
         forbid=[]
         current = ''
         labelText.set("-")
         canvas.coords(oval, -10,-10,-10,-10)
 
-    elif event.char in "אבגדהוזחטיכלמנסעפצקרשת":
-        current = event.char + current
-        options = choose_all(current,settlements)
+    elif char in "אבגדהוזחטיכלמנסעפצקרשת":
+        current = char + current
+        options = choose_all(current, settlements, forbid)
         if not options:
-            options = choose_all(current[1:],settlements)
+            options = choose_all(current[1:],settlements, forbid)
             option = options[random.randint(0,len(options)-1)]
             info = settlements_data[option[1]]
+            draw_settlements(option[1])
             m1 = "שם הישוב:{}".format(info["name"])
             m2 = "{}:הוקם בשנת".format(info["establishment"])
             m3 = "{}:תושבים".format(info["population"])
             message="\n".join([m1,m2,m3])
+
+            all_former = find_all_former(options)
+            if all_former:
+                names = [settlements_data[n]["name"] for n in all_former]
+                message += "\n"
+                message += ":מחוץ למשחק"
+                message += "\n"
+                message += ",".join(names)
+                forbid = list(all_former)
+
             messagebox.showerror(title="!אתה בור", message=message)
             # restart !
             current = ''
-            options = choose_all(current,settlements)
-        letter, chosen_settlement = options[random.randint(0,len(options)-1)]
+            options = choose_all(current,settlements, forbid)
+        letter, chosen_settlement, former = options[random.randint(0,len(options)-1)]
 
         current = letter + current
         labelText.set(current[::-1])
@@ -201,7 +239,7 @@ def kp(event):
 
 root = Tk.Tk()
 image = Image.open("israel.jpg")
-zoom = .1
+zoom = .2
 pixels_x, pixels_y = tuple([int(zoom * x)  for x in image.size])
 background_image = ImageTk.PhotoImage(image.resize((pixels_x, pixels_y)))
 canvas = Tk.Canvas(root)
@@ -216,7 +254,6 @@ canvas.pack(side="top", fill="both", expand=True)
 label.pack(side="bottom")
 root.minsize(width=pixels_x, height=pixels_y+15)
 root.resizable(0, 0) #Don't allow resizing in the x or y direction
-#root.wm_geometry("794x370")
 root.title('Map')
 root.bind_all('<KeyPress>', kp)
 root.mainloop()
@@ -227,7 +264,7 @@ for a in range(1000000):
     if not options:
         print("end")
         quit()
-    letter, chosen_settlement = options[random.randint(0,len(options)-1)]
+    letter, chosen_settlement, former = options[random.randint(0,len(options)-1)]
     current = letter + current
     print(current)
     your = input("?")
