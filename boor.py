@@ -1,7 +1,6 @@
 import random
 import tkinter as Tk
 from tkinter import messagebox
-from PIL import ImageTk, Image
 import os
 
 global gui_globals, game_globals
@@ -174,7 +173,6 @@ def find_all_former(options):
 
 def draw_settlements(name):
     coordinates = gui_globals["converter"](settlements_data[name]["itm"])
-    coordinates = coordinates*gui_globals["zoom"]
     x,y = 10,10
     values = map(int, [coordinates[0]-x, coordinates[1]-y, coordinates[0]+x, coordinates[1]+y])
     gui_globals["canvas"].coords(gui_globals["oval"], *values)
@@ -232,8 +230,8 @@ here_dir = os.path.dirname(__file__)
 
 main_file = os.path.join(here_dir,"settlements.csv")
 exceptions_file  = os.path.join(here_dir,"exceptions.csv")
-mapping_file  = os.path.join(here_dir,"israel.csv")
-image_file = os.path.join(here_dir,"israel.jpg")
+mapping_file  = os.path.join(here_dir,"israel.png.csv")
+image_file = os.path.join(here_dir,"israel.png")
 
 settlements_data = create_settlements_data(main_file, exceptions_file)
 settlements = list(settlements_data.keys())
@@ -250,21 +248,19 @@ game_globals["settlements_data"] = settlements_data
 gui_globals["converter"] = converter
 gui_globals["root"] = Tk.Tk()
 root = gui_globals["root"]
-image = Image.open(image_file)
-gui_globals["zoom"] = .15
-pixels_x, pixels_y = tuple([int(gui_globals["zoom"] * x)  for x in image.size])
-background_image = ImageTk.PhotoImage(image.resize((pixels_x, pixels_y)))
+
+background_image = Tk.PhotoImage(file=image_file)
 canvas = Tk.Canvas(gui_globals["root"])
 gui_globals["canvas"] = canvas
 image = canvas.create_image(0, 0, anchor=Tk.NW, image=background_image)
-gui_globals["points"] = canvas.create_text(250*gui_globals["zoom"],150*gui_globals["zoom"],fill="orange",font="Times 20 italic bold", text="-")
+gui_globals["points"] = canvas.create_text(30,20,fill="orange",font="Times 20 italic bold", text="-")
 gui_globals["label"] = Tk.StringVar()
 gui_globals["label"].set("-")
 label = Tk.Label(root, textvariable=gui_globals["label"])
 gui_globals["oval"] = canvas.create_oval(-10,-10,-10,10, outline='red',width=3,fill='')
 canvas.pack(side="top", fill="both", expand=True)
 label.pack(side="bottom")
-root.minsize(width=pixels_x, height=pixels_y+15)
+root.minsize(width=background_image.width(), height=background_image.height()+15)
 root.resizable(0, 0) #Don't allow resizing in the x or y direction
 root.title('Map')
 root.bind_all('<KeyPress>', kp)
