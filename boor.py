@@ -2,133 +2,10 @@ import random
 import tkinter as Tk
 from tkinter import messagebox
 import os
+import json
+import codecs
 
 global gui_globals, game_globals
-
-def read_settlements(filename):
-    """
-    This method reads the settlements file.
-    It's an csv file, exported by excel, imported from https://data.gov.il/dataset/settlement-file :
-    https://www.cbs.gov.il/he/publications/doclib/2019/ishuvim/bycode2018.xlsx
-
-    The file begins with a BOM of utf8.
-
-    The method return an dictionary, the key is the name of the settlement, and the values are the parsed columns :
-        population
-        establishment (year)
-        location (touple, itm)
-    """
-
-    fid = open(filename,"r",encoding="utf8")
-    fid.read(1)  # ignore BOM
-    captions = fid.readline()
-    used_captions = {"name":0, "religion":8, "population":9, "establishment":13, "location":16}
-    JEWISH = '1'
-    MEORAV = '4'
-    data = {}
-    for line in fid:
-        splitted = line.split(",")
-        name = splitted[used_captions["name"]]
-        if splitted[used_captions["religion"]] in [JEWISH, MEORAV]:
-            data[name] = {}
-            for column in ["name", "population", "establishment", "location"]:
-                index = used_captions[column]
-                data[name][column] = splitted[index]
-            itm = data[name]["location"]
-            data[name]["itm"] = (float(itm[:5]), float(itm[5:]))
-    fid.close()
-    return data
-
-def split_exceptions(data, filename):
-    """
-    This method uses an exceptions file to split some settlement to more than one :
-     ("תל אביב-יפו") will become both "תל אביב" and "יפו"
-    The manually made file is an csv, with the format :
-        name(as in the main file), name-option1, name-option2, ...
-    The original name will be deleted.
-    """
-
-    fid = open(filename,"r",encoding="utf8")
-    fid.read(1)  # ignore BOM
-    for line in fid:
-        splitted = line.split(",")
-        name = splitted[0]
-        for alternative in splitted[1:]:
-            alternative=alternative.strip()
-            if alternative:
-                data[alternative] = data[name]
-        del data[name]
-    fid.close()
-
-def remove_sofit(name):
-    """
-    Change the final letters מנצפכ to regular
-    """
-    # end letters
-    for f,t in zip("מנצפכ", "םןץףך"):
-        name = name.replace(t,f)
-    return name
-
-def name_to_key(name):
-    """
-    Convert name of a settlement to a key of the dictionary.
-    The key will be the final name in the game
-    """
-    # remove what in ()
-    name = name.strip()
-    if "(" in name and ")" in name:
-        name = name[:name.find("(")]+name[name.find(")")+1:]
-    name = remove_sofit(name)
-    # special characters
-    name = ''.join(ch for ch in name if ch.isalnum())
-    return name[::-1]
-
-def create_coordinates_converter(settlements_data, map_file):
-    """
-    Create coordinate converted from itm to the image coordinates, using 3 pre-found settlements.
-    """
-
-    fid = open(map_file,"r",encoding="utf8")
-    fid.read(1)  # ignore BOM
-    mappings = {}
-    for line in fid:
-        splitted = line.split(",")
-        mappings[name_to_key(splitted[0])] = (int(splitted[1]),int(splitted[2]))
-
-    import numpy as np
-    def solve_affine( p1, p2, p3, s1, s2, s3 ):
-        x = np.transpose(np.matrix([p1,p2,p3]))
-        y = np.transpose(np.matrix([s1,s2,s3]))
-        # add ones on the bottom of x and y
-        x = np.vstack((x,[1,1,1]))
-        y = np.vstack((y,[1,1,1]))
-        # solve for A2
-        A2 = y * x.I
-        # return function that takes input x and transforms it
-        # don't need to return the 4th row as it is
-        return lambda x: (A2*np.vstack((np.matrix(x).reshape(2,1),1)))[0:2,:]
-    map_settlemets = list(mappings.keys())
-    transformFn = solve_affine( settlements_data[map_settlemets[0]]["itm"], settlements_data[map_settlemets[1]]["itm"], settlements_data[map_settlemets[2]]["itm"],
-                                mappings[map_settlemets[0]], mappings[map_settlemets[1]], mappings[map_settlemets[2]])
-
-    return transformFn
-
-def create_settlements_data(main_file, exceptions_file):
-    """
-    Create settlement data from settlements and exceptions csv files
-
-    Output :
-    a dictionary - keys are the final names of the game, value is a dictionary with the data about each settlement
-    """
-    data = read_settlements(main_file)
-    split_exceptions(data,exceptions_file)
-
-    settlements_data={}
-    for key, value in data.items():
-        if not key:
-            pass
-        settlements_data[name_to_key(key)] = value
-    return settlements_data
 
 
 def choose_all(current, settlements, former = None):
@@ -172,10 +49,21 @@ def find_all_former(options):
 
 
 def draw_settlements(name):
-    coordinates = gui_globals["converter"](settlements_data[name]["itm"])
-    x,y = 10,10
-    values = map(int, [coordinates[0]-x, coordinates[1]-y, coordinates[0]+x, coordinates[1]+y])
+    x,y = settlements_data[name]["x"], settlements_data[name]["y"]
+    dx,dy = 10,10
+    values = map(int, [x-dx, y-dy, x+dx, y+dy])
     gui_globals["canvas"].coords(gui_globals["oval"], *values)
+
+
+def remove_sofit(name):
+    """
+    Change the final letters מנצפכ to regular
+    """
+    # end letters
+    for f,t in zip("מנצפכ", "םןץףך"):
+        name = name.replace(t,f)
+    return name
+
 
 def kp(event):
     settlements_data, settlements = game_globals["settlements_data"], game_globals["settlements"]
@@ -227,15 +115,12 @@ def kp(event):
 
 # Read data
 here_dir = os.path.dirname(__file__)
-
-main_file = os.path.join(here_dir,"settlements.csv")
-exceptions_file  = os.path.join(here_dir,"exceptions.csv")
-mapping_file  = os.path.join(here_dir,"israel.png.csv")
 image_file = os.path.join(here_dir,"israel.png")
 
-settlements_data = create_settlements_data(main_file, exceptions_file)
+data_file = os.path.join(here_dir,"data.json")
+with codecs.open(data_file, 'r', 'utf-8-sig') as fid:
+    settlements_data = json.load(fid)
 settlements = list(settlements_data.keys())
-converter = create_coordinates_converter(settlements_data, mapping_file)
 
 # init globals
 gui_globals = {}
@@ -245,7 +130,6 @@ game_globals["current"] = ''
 game_globals["forbid"] = []
 game_globals["settlements_data"] = settlements_data
 
-gui_globals["converter"] = converter
 gui_globals["root"] = Tk.Tk()
 root = gui_globals["root"]
 
@@ -267,7 +151,6 @@ root.bind_all('<KeyPress>', kp)
 root.mainloop()
 
 
-
 # usused
 def no_gui():
     for a in range(1000000):
@@ -281,5 +164,3 @@ def no_gui():
         your = input("?")
         current = your + current
         print(current, chosen_settlement)
-
-
